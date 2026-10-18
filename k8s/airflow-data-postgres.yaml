@@ -1,0 +1,67 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: airflow-data-postgres-pvc
+  namespace: sql
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: airflow-data-postgres
+  namespace: sql
+  labels:
+    app: airflow-data-postgres
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: airflow-data-postgres
+  template:
+    metadata:
+      labels:
+        app: airflow-data-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:14.1
+          env:
+            - name: POSTGRES_USER
+              value: airflow_data
+            - name: POSTGRES_PASSWORD
+              value: airflow_data
+            - name: POSTGRES_DB
+              value: airflow_data
+          ports:
+            - containerPort: 5432
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "airflow_data"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: airflow-data-postgres-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: airflow-data-postgres
+  namespace: sql
+spec:
+  selector:
+    app: airflow-data-postgres
+  ports:
+    - port: 5432
+      targetPort: 5432

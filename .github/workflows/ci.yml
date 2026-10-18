@@ -1,0 +1,163 @@
+# CI/CD for the AQI pipeline.
+#
+#   validate  every push and PR: render and schema-check all manifests, check
+#             the Prometheus rules and Grafana dashboards
+#   image     when the image's inputs changed: build the Airflow image and load
+#             every DAG inside it; on main, push it to GHCR
+#   deploy    on main: write the new image tag into airflow-values.yaml and
+#             commit it. ArgoCD (in the cluster, which GitHub cannot reach)
+#             notices the commit and rolls out the new image.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}/airflow
+  KUBERNETES_VERSION: 1.32.0
+  KUBECONFORM_VERSION: v0.6.7
+  PROMETHEUS_IMAGE: prom/prometheus:v2.55.1
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      image: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.image == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            image:
+              - Dockerfile
+              - .dockerignore
+              - dags/**
+              - plugins/**
+              - ci/**
+
+  validate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install kubeconform
+        run: |
+          curl -sSL "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz" \
+            | tar -xz -C /usr/local/bin kubeconform
+
+      - name: Render manifests
+        run: |
+          mkdir -p rendered
+          for dir in k8s minio monitoring; do
+            kubectl kustomize "$dir" > "rendered/$dir.yaml"
+          done
+          helm repo add apache-airflow https://airflow.apache.org
+          helm template airflow apache-airflow/airflow --version 1.10.0 \
+            --namespace airflow -f airflow-values.yaml > rendered/airflow.yaml
+
+      - name: Schema-check manifests
+        run: |
+          kubeconform -strict -summary -kubernetes-version "$KUBERNETES_VERSION" \
+            -schema-location default \
+            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+            rendered/*.yaml argocd/root.yaml argocd/apps/*.yaml
+
+      - name: Check Prometheus rules
+        run: |
+          docker run --rm --entrypoint promtool -v "$PWD/monitoring/prometheus:/p:ro" \
+            "$PROMETHEUS_IMAGE" check rules /p/alerts.yml
+
+      - name: Check Grafana dashboards
+        run: |
+          for f in monitoring/grafana/dashboards/*.json; do
+            python3 -m json.tool "$f" > /dev/null && echo "ok $f"
+          done
+
+  image:
+    needs: [changes, validate]
+    if: needs.changes.outputs.image == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Image tag
+        id: tag
+        run: echo "tag=2.6.1-py310-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: ${{ env.IMAGE }}:${{ steps.tag.outputs.tag }}
+          labels: org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Load every DAG in the image
+        run: |
+          docker run --rm -v "$PWD/ci:/ci:ro" "$IMAGE:${{ steps.tag.outputs.tag }}" \
+            python /ci/test_dags.py
+
+      - name: Check the Anthropic SDK venv
+        run: |
+          docker run --rm "$IMAGE:${{ steps.tag.outputs.tag }}" \
+            /home/airflow/anthropic-venv/bin/python -c 'import anthropic; print("anthropic", anthropic.__version__)'
+
+      - name: Push to GHCR
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker push "$IMAGE:${{ steps.tag.outputs.tag }}"
+
+  deploy:
+    needs: image
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Point airflow-values.yaml at the new image
+        env:
+          TAG: ${{ needs.image.outputs.tag }}
+        run: |
+          # sed, not yq: yq drops the blank lines and reflows the file.
+          sed -i -E \
+            -e "/^images:/,/^$/ s|^(    repository: ).*|\1${IMAGE}|" \
+            -e "/^images:/,/^$/ s|^(    tag: ).*|\1\"${TAG}\"|" \
+            -e "s|^(defaultAirflowRepository: ).*|\1${IMAGE}|" \
+            -e "s|^(defaultAirflowTag: ).*|\1\"${TAG}\"|" \
+            airflow-values.yaml
+          grep -c "$TAG" airflow-values.yaml | grep -qx 2
+          git diff --stat
+
+      # Commits made with GITHUB_TOKEN do not trigger another workflow run.
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "Deploy Airflow image ${{ needs.image.outputs.tag }}"
+          git pull --rebase origin main
+          git push origin HEAD:main

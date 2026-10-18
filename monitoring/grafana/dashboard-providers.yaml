@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: aqi
+    folder: AQI
+    type: file
+    # Dashboards come from files in this repo; edit the JSON, not the UI.
+    allowUiUpdates: false
+    disableDeletion: true
+    options:
+      path: /etc/grafana/dashboards

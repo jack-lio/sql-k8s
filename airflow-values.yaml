@@ -1,0 +1,115 @@
+executor: CeleryExecutor
+
+# CI (.github/workflows/ci.yml) rewrites these four lines to the image it
+# pushed to GHCR; ArgoCD then rolls the Airflow pods to that image.
+images:
+  airflow:
+    repository: airflow-custom
+    tag: "2.6.1-py310-aqi-20261018c"
+    pullPolicy: IfNotPresent
+
+defaultAirflowRepository: airflow-custom
+defaultAirflowTag: "2.6.1-py310-aqi-20261018c"
+
+# Pull secret for a private GHCR package (created by bootstrap-secrets.sh when
+# GHCR_TOKEN is set). Pods still start when it is missing and the image is public.
+registry:
+  secretName: ghcr-pull
+
+# The chart generates these three with random values on every render. Helm only
+# did that at install time, but ArgoCD renders on every sync and would keep
+# rotating them (a new Fernet key breaks every stored connection). They are
+# created once by bootstrap-secrets.sh instead.
+fernetKeySecretName: airflow-fernet-key
+data:
+  brokerUrlSecretName: airflow-broker-url
+
+# MOENV_API_KEY and WAQI_TOKEN for 04.aqi-info.py, from the
+# airflow-dag-secrets Secret (created from k3s/secrets.env).
+extraEnvFrom: |
+  - secretRef:
+      name: airflow-dag-secrets
+
+webserverSecretKeySecretName: ~
+webserverSecretKey: "footprintai-local-dev-secret-key"
+
+config:
+  core:
+    load_examples: "True"
+    dags_are_paused_at_creation: "True"
+  webserver:
+    expose_config: "True"
+
+dags:
+  persistence:
+    enabled: false
+  gitSync:
+    enabled: false
+
+webserver:
+  defaultUser:
+    enabled: true
+    username: airflow
+    password: airflow
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "1Gi"
+    limits:
+      cpu: "1"
+      memory: "2Gi"
+  service:
+    type: ClusterIP
+
+scheduler:
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "1Gi"
+    limits:
+      cpu: "1"
+      memory: "2Gi"
+
+workers:
+  replicas: 1
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "1Gi"
+    limits:
+      cpu: "1"
+      memory: "2Gi"
+
+triggerer:
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "512Mi"
+    limits:
+      cpu: "500m"
+      memory: "1Gi"
+
+postgresql:
+  enabled: true
+  image:
+    repository: bitnamilegacy/postgresql
+    tag: "15"
+
+redis:
+  enabled: true
+  passwordSecretName: airflow-redis-password
+
+# ArgoCD runs these Jobs as Sync hooks: deleted and re-created on every sync,
+# which avoids the "field is immutable" error that plain apply hits on Jobs.
+createUserJob:
+  useHelmHooks: false
+  applyCustomEnv: false
+  jobAnnotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+migrateDatabaseJob:
+  useHelmHooks: false
+  applyCustomEnv: false
+  jobAnnotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation

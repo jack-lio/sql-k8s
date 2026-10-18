@@ -1,0 +1,50 @@
+# One pod per node; reads the host's /proc, /sys and filesystems.
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: node-exporter
+  namespace: monitoring
+  labels:
+    app: node-exporter
+spec:
+  selector:
+    matchLabels:
+      app: node-exporter
+  template:
+    metadata:
+      labels:
+        app: node-exporter
+    spec:
+      hostNetwork: true
+      hostPID: true
+      tolerations:
+        - operator: Exists
+      containers:
+        - name: node-exporter
+          image: quay.io/prometheus/node-exporter:v1.8.2
+          args:
+            - --path.rootfs=/host
+            - --web.listen-address=:9100
+            - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|run|var/lib/docker/.+|var/lib/kubelet/.+)($|/)
+          ports:
+            - name: metrics
+              containerPort: 9100
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            readOnlyRootFilesystem: true
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+          volumeMounts:
+            - name: root
+              mountPath: /host
+              readOnly: true
+              mountPropagation: HostToContainer
+      volumes:
+        - name: root
+          hostPath:
+            path: /

@@ -1,0 +1,24 @@
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus.monitoring.svc:9090
+    isDefault: true
+    jsonData:
+      timeInterval: 30s
+
+  # The AQI data the Airflow DAGs write, read with the read-only role.
+  - name: AQI Postgres
+    uid: aqi-postgres
+    type: grafana-postgresql-datasource
+    url: airflow-data-postgres.sql.svc:5432
+    user: monitoring
+    jsonData:
+      database: airflow_data
+      sslmode: disable
+      postgresVersion: 1400
+    secureJsonData:
+      password: $MONITORING_DB_PASSWORD

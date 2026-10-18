@@ -1,0 +1,99 @@
+# Extra postgres-exporter metrics for the airflow_data database.
+# Metric names are <key>_<column>, e.g. aqi_station_latest_timestamp_seconds.
+
+aqi_station:
+  # aqi4_info.time has no time zone. Taiwan stations publish in Asia/Taipei;
+  # the WAQI stations use their local time, so their freshness is approximate.
+  # The value columns are TEXT; non-numeric values (e.g. "" or "-") become NULL.
+  query: |
+    SELECT s.device_id, s.latest_timestamp_seconds, s.rows, l.latest_aqi, l.latest_pm2_5
+    FROM (
+        SELECT device_id,
+               EXTRACT(EPOCH FROM (max(time) AT TIME ZONE 'Asia/Taipei')) AS latest_timestamp_seconds,
+               count(*) AS rows
+        FROM aqi4_info
+        GROUP BY device_id
+    ) s
+    JOIN (
+        SELECT DISTINCT ON (device_id) device_id,
+               CASE WHEN aqi ~ '^[0-9]+(\.[0-9]+)?$' THEN aqi::float END AS latest_aqi,
+               CASE WHEN pm2_5 ~ '^[0-9]+(\.[0-9]+)?$' THEN pm2_5::float END AS latest_pm2_5
+        FROM aqi4_info
+        ORDER BY device_id, time DESC
+    ) l USING (device_id)
+  metrics:
+    - device_id:
+        usage: LABEL
+        description: Station name
+    - latest_timestamp_seconds:
+        usage: GAUGE
+        description: Time of the newest row for this station (Unix seconds)
+    - rows:
+        usage: GAUGE
+        description: Rows stored for this station (the DAG keeps 3 days)
+    - latest_aqi:
+        usage: GAUGE
+        description: AQI of the newest row
+    - latest_pm2_5:
+        usage: GAUGE
+        description: PM2.5 of the newest row
+
+aqi_table:
+  query: |
+    SELECT relname AS table_name,
+           pg_total_relation_size(relid) AS size_bytes,
+           n_live_tup AS live_rows
+    FROM pg_stat_user_tables
+  metrics:
+    - table_name:
+        usage: LABEL
+        description: Table name
+    - size_bytes:
+        usage: GAUGE
+        description: Table size including indexes and TOAST
+    - live_rows:
+        usage: GAUGE
+        description: Estimated live rows
+
+aqi_prediction:
+  # Newest prediction per station from DAG 07 (aqi_image_predict).
+  query: |
+    SELECT DISTINCT ON (sitename) sitename,
+           EXTRACT(EPOCH FROM (image_time AT TIME ZONE 'Asia/Taipei')) AS latest_image_timestamp_seconds,
+           pred_class AS latest_pred_class
+    FROM aqi_prediction
+    ORDER BY sitename, image_time DESC
+  metrics:
+    - sitename:
+        usage: LABEL
+        description: Station name
+    - latest_image_timestamp_seconds:
+        usage: GAUGE
+        description: Capture time of the newest photo that was predicted (Unix seconds)
+    - latest_pred_class:
+        usage: GAUGE
+        description: Predicted AQI class of the newest photo (0 Good ... 5 Severe)
+
+pipeline_health:
+  # Newest report of the aqi_pipeline_health DAG (08.aqi-pipeline-health.py).
+  query: |
+    SELECT EXTRACT(EPOCH FROM checked_at) AS latest_check_timestamp_seconds,
+           CASE overall_status WHEN 'healthy' THEN 0 WHEN 'degraded' THEN 1 ELSE 2 END AS latest_status,
+           jsonb_array_length(issues) AS latest_issues,
+           CASE WHEN ai_status = 'ok' THEN 1 ELSE 0 END AS latest_ai_ok
+    FROM pipeline_health_report
+    ORDER BY checked_at DESC
+    LIMIT 1
+  metrics:
+    - latest_check_timestamp_seconds:
+        usage: GAUGE
+        description: When the newest health report was made (Unix seconds)
+    - latest_status:
+        usage: GAUGE
+        description: 0 healthy, 1 degraded, 2 failing
+    - latest_issues:
+        usage: GAUGE
+        description: Issues listed in the newest report
+    - latest_ai_ok:
+        usage: GAUGE
+        description: 1 if Claude produced the newest report, 0 if it fell back to the rule checks

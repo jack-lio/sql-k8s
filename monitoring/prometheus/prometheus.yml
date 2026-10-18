@@ -1,0 +1,92 @@
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: [localhost:9090]
+
+  # ingress-nginx 每個請求的數量、延遲、狀態碼
+  - job_name: ingress-nginx
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names: [ingress-nginx]
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_component]
+        regex: controller
+        action: keep
+      - source_labels: [__meta_kubernetes_pod_ip]
+        target_label: __address__
+        replacement: $1:10254
+
+  # Pod / Deployment / Job 狀態（重啟次數、是否 Ready 等）
+  - job_name: kube-state-metrics
+    static_configs:
+      - targets: [kube-state-metrics.monitoring.svc:8080]
+
+  # 機器的 CPU、記憶體、磁碟
+  - job_name: node-exporter
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names: [monitoring]
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_label_app]
+        regex: node-exporter
+        action: keep
+      - source_labels: [__meta_kubernetes_pod_node_name]
+        target_label: node
+
+  # 每個容器的 CPU、記憶體（kubelet 內建的 cAdvisor）
+  - job_name: kubelet-cadvisor
+    scheme: https
+    metrics_path: /metrics/cadvisor
+    authorization:
+      credentials_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+    tls_config:
+      ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+      insecure_skip_verify: true
+    kubernetes_sd_configs:
+      - role: node
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_node_name]
+        target_label: node
+    # Drop the high-cardinality series nobody here graphs. Queries use the
+    # pod-level series {namespace!="", container=""}: on minikube (Docker,
+    # cgroup v1) the per-container series carry no pod labels at all.
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: container_(cpu_usage_seconds_total|memory_working_set_bytes)
+        action: keep
+
+  # Airflow 的 DAG 執行次數、成功/失敗、執行時間（Helm chart 內建的 statsd exporter）
+  - job_name: airflow
+    static_configs:
+      - targets: [airflow-statsd.airflow.svc:9102]
+
+  # Postgres：資料庫大小、連線數，以及 AQI 各測站最新資料時間
+  - job_name: postgres
+    static_configs:
+      - targets: [postgres-exporter-aqi.monitoring.svc:9187]
+        labels:
+          db: airflow_data
+      - targets: [postgres-exporter-app.monitoring.svc:9187]
+        labels:
+          db: footprintai
+
+  # MinIO：叢集健康、可用空間（照片存放）
+  - job_name: minio
+    metrics_path: /minio/v2/metrics/cluster
+    static_configs:
+      - targets: [minio.minio.svc:9000]
+
+  # MinIO：每個 bucket 的大小和物件數
+  - job_name: minio-bucket
+    metrics_path: /minio/v2/metrics/bucket
+    static_configs:
+      - targets: [minio.minio.svc:9000]

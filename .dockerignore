@@ -1,0 +1,6 @@
+# Only dags/ and plugins/ go into the Airflow image; keep secrets and
+# manifests out of the build context.
+*
+!dags/
+!plugins/
+**/__pycache__

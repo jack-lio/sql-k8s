@@ -1,0 +1,55 @@
+# Creates (or updates) the read-only "monitoring" role in both Postgres
+# databases, with the password from the monitoring-db Secret. Runs on every
+# ArgoCD sync (Sync hook), so a new password in monitoring/secrets.env is
+# applied by re-running bootstrap-secrets.sh and syncing.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: monitoring-role
+  namespace: sql
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 10
+  ttlSecondsAfterFinished: 86400
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: psql
+          image: postgres:14.1
+          command:
+            - /bin/bash
+            - -ec
+            - |
+              # role <host> <owner/user> <database>; the owner passwords are the
+              # ones in k8s/*-postgres.yaml.
+              role() {
+                  PGPASSWORD="$2" psql -q -v ON_ERROR_STOP=1 -h "$1" -U "$2" -d "$3" \
+                      -v password="$MONITORING_DB_PASSWORD" -v dbname="$3" -v owner="$2" \
+                      -f /sql/create-monitoring-role.sql
+                  echo "monitoring role ready in $3"
+              }
+              role airflow-data-postgres airflow_data airflow_data
+              role app-postgres footprintai footprintai
+          env:
+            - name: MONITORING_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: monitoring-db
+                  key: MONITORING_DB_PASSWORD
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+          volumeMounts:
+            - name: sql
+              mountPath: /sql
+              readOnly: true
+      volumes:
+        - name: sql
+          configMap:
+            name: monitoring-role-sql

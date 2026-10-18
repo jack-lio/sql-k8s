@@ -1,0 +1,112 @@
+# MinIO object storage for station images (bucket aqi-images).
+#
+# Image: bitnamilegacy/minio. Upstream MinIO no longer publishes community
+# images anonymously and Bitnami froze this repository in 2025, so it gets no
+# security updates. Fine for a local lab; anything speaking the S3 API
+# (SeaweedFS, Garage) can replace it by changing the endpoint only.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: minio
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio
+  namespace: minio
+spec:
+  selector:
+    app: minio
+  ports:
+    - name: api
+      port: 9000
+      targetPort: api
+    - name: console
+      port: 9001
+      targetPort: console
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: minio
+  namespace: minio
+  labels:
+    app: minio
+spec:
+  serviceName: minio
+  replicas: 1
+  selector:
+    matchLabels:
+      app: minio
+  template:
+    metadata:
+      labels:
+        app: minio
+    spec:
+      # No runAsGroup: Bitnami images make their writable dirs (e.g.
+      # /opt/bitnami/minio/tmp) group-writable for GID 0, OpenShift style.
+      # Overriding the GID breaks every restart with "minio.pid: Permission denied".
+      securityContext:
+        runAsUser: 1001
+        fsGroup: 1001
+      containers:
+        - name: minio
+          image: bitnamilegacy/minio:2025.7.23-debian-12-r5
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: minio-credentials
+                  key: MINIO_ROOT_USER
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: minio-credentials
+                  key: MINIO_ROOT_PASSWORD
+            # Let Prometheus scrape /minio/v2/metrics/* without a token.
+            - name: MINIO_PROMETHEUS_AUTH_TYPE
+              value: public
+          ports:
+            - name: api
+              containerPort: 9000
+            - name: console
+              containerPort: 9001
+          readinessProbe:
+            httpGet:
+              path: /minio/health/ready
+              port: api
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /minio/health/live
+              port: api
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 50m
+              memory: 256Mi
+            limits:
+              memory: 1Gi
+          volumeMounts:
+            - name: data
+              mountPath: /bitnami/minio/data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 10Gi
+---
+# Requests only (see k8s/storage-limits.yaml); the enforced cap is the bucket
+# quota set by the init Job.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: storage
+  namespace: minio
+spec:
+  hard:
+    requests.storage: 20Gi
+    persistentvolumeclaims: "2"

@@ -1,0 +1,21 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# ArgoCD itself, pinned. Installed by argocd/bootstrap.sh (server-side apply:
+# the CRDs are too large for the last-applied annotation).
+namespace: argocd
+
+resources:
+  - namespace.yaml
+  - https://raw.githubusercontent.com/argoproj/argo-cd/v3.5.5/manifests/install.yaml
+
+patches:
+  # Run the API server without TLS; it is only reached through port-forward.
+  - target:
+      kind: ConfigMap
+      name: argocd-cmd-params-cm
+    patch: |-
+      - op: add
+        path: /data
+        value:
+          server.insecure: "true"

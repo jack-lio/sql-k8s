@@ -1,0 +1,464 @@
+{
+  "uid": "aqi-data",
+  "title": "AQI 測站資料",
+  "tags": [
+    "aqi"
+  ],
+  "timezone": "Asia/Taipei",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": false,
+  "refresh": "5m",
+  "time": {
+    "from": "now-3d",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "各測站最新 AQI",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 16,
+        "h": 5
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 51
+              },
+              {
+                "color": "orange",
+                "value": 101
+              },
+              {
+                "color": "red",
+                "value": 151
+              },
+              {
+                "color": "purple",
+                "value": 201
+              },
+              {
+                "color": "dark-red",
+                "value": 301
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "orientation": "auto",
+        "justifyMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "aqi_station_latest_aqi",
+          "legendFormat": "{{device_id}}",
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "資料多久沒更新（台灣測站）",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 0,
+        "w": 8,
+        "h": 5
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 7200
+              },
+              {
+                "color": "red",
+                "value": 10800
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "orientation": "auto",
+        "justifyMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "time() - aqi_station_latest_timestamp_seconds{device_id=~\"基隆|林口|嘉義|安南\"}",
+          "legendFormat": "{{device_id}}",
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "description": "測站每小時發布一次；超過 3 小時（紅色）會觸發 AqiStationDataStale 告警。"
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "AQI 趨勢",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "aqi-postgres"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 12,
+        "h": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "showPoints": "always",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "aqi-postgres"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT time AT TIME ZONE 'Asia/Taipei' AS time, device_id AS metric, CASE WHEN aqi ~ '^[0-9]+(\\.[0-9]+)?$' THEN aqi::float END AS value FROM aqi4_info WHERE $__timeFilter(time AT TIME ZONE 'Asia/Taipei') ORDER BY 1",
+          "refId": "A"
+        }
+      ],
+      "description": "DAG 只保留 3 天的資料。"
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "PM2.5 趨勢 (μg/m³)",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "aqi-postgres"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 5,
+        "w": 12,
+        "h": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "showPoints": "always",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "aqi-postgres"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT time AT TIME ZONE 'Asia/Taipei' AS time, device_id AS metric, CASE WHEN pm2_5 ~ '^[0-9]+(\\.[0-9]+)?$' THEN pm2_5::float END AS value FROM aqi4_info WHERE $__timeFilter(time AT TIME ZONE 'Asia/Taipei') ORDER BY 1",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "table",
+      "title": "最新 30 筆資料",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "aqi-postgres"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 14,
+        "w": 24,
+        "h": 10
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "aqi-postgres"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT time, device_id AS 測站, aqi, pm2_5, pm10, o3, co, so2, no2 FROM aqi4_info ORDER BY time DESC, device_id LIMIT 30",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "row",
+      "title": "照片推論 vs 環境部實際值（DAG aqi_image_predict，每小時 :20）",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 7,
+      "type": "table",
+      "title": "各測站最新預測",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "aqi-postgres"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 25,
+        "w": 16,
+        "h": 7
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "aqi-postgres"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT p.sitename AS 測站, p.image_time AS 照片時間, p.pred_label AS 預測, a.aqi AS 實際AQI, (ARRAY['Good','Moderate','USG','Unhealthy','Very Unhealthy','Severe'])[(CASE WHEN CASE WHEN a.aqi ~ '^[0-9]+(\\.[0-9]+)?$' THEN a.aqi::float END IS NULL THEN NULL WHEN CASE WHEN a.aqi ~ '^[0-9]+(\\.[0-9]+)?$' THEN a.aqi::float END <= 50 THEN 0 WHEN CASE WHEN a.aqi ~ '^[0-9]+(\\.[0-9]+)?$' THEN a.aqi::float END <= 100 THEN 1 WHEN CASE WHEN a.aqi ~ '^[0-9]+(\\.[0-9]+)?$' THEN a.aqi::float END <= 150 THEN 2 WHEN CASE WHEN a.aqi ~ '^[0-9]+(\\.[0-9]+)?$' THEN a.aqi::float END <= 200 THEN 3 WHEN CASE WHEN a.aqi ~ '^[0-9]+(\\.[0-9]+)?$' THEN a.aqi::float END <= 300 THEN 4 ELSE 5 END) + 1] AS 實際等級, CASE WHEN (CASE WHEN CASE WHEN a.aqi ~ '^[0-9]+(\\.[0-9]+)?$' THEN a.aqi::float END IS NULL THEN NULL WHEN CASE WHEN a.aqi ~ '^[0-9]+(\\.[0-9]+)?$' THEN a.aqi::float END <= 50 THEN 0 WHEN CASE WHEN a.aqi ~ '^[0-9]+(\\.[0-9]+)?$' THEN a.aqi::float END <= 100 THEN 1 WHEN CASE WHEN a.aqi ~ '^[0-9]+(\\.[0-9]+)?$' THEN a.aqi::float END <= 150 THEN 2 WHEN CASE WHEN a.aqi ~ '^[0-9]+(\\.[0-9]+)?$' THEN a.aqi::float END <= 200 THEN 3 WHEN CASE WHEN a.aqi ~ '^[0-9]+(\\.[0-9]+)?$' THEN a.aqi::float END <= 300 THEN 4 ELSE 5 END) IS NULL THEN '尚無實際值' WHEN (CASE WHEN CASE WHEN a.aqi ~ '^[0-9]+(\\.[0-9]+)?$' THEN a.aqi::float END IS NULL THEN NULL WHEN CASE WHEN a.aqi ~ '^[0-9]+(\\.[0-9]+)?$' THEN a.aqi::float END <= 50 THEN 0 WHEN CASE WHEN a.aqi ~ '^[0-9]+(\\.[0-9]+)?$' THEN a.aqi::float END <= 100 THEN 1 WHEN CASE WHEN a.aqi ~ '^[0-9]+(\\.[0-9]+)?$' THEN a.aqi::float END <= 150 THEN 2 WHEN CASE WHEN a.aqi ~ '^[0-9]+(\\.[0-9]+)?$' THEN a.aqi::float END <= 200 THEN 3 WHEN CASE WHEN a.aqi ~ '^[0-9]+(\\.[0-9]+)?$' THEN a.aqi::float END <= 300 THEN 4 ELSE 5 END) = p.pred_class THEN '相符' ELSE '不符' END AS 結果, p.rh, p.temperature, p.ws_hr, p.image_key AS MinIO檔案 FROM (SELECT DISTINCT ON (sitename) * FROM aqi_prediction ORDER BY sitename, image_time DESC) p LEFT JOIN aqi4_info a ON a.device_id = p.sitename AND a.time = date_trunc('hour', p.image_time) ORDER BY 1",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "stat",
+      "title": "預測準確率（所選時間範圍）",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "aqi-postgres"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 25,
+        "w": 8,
+        "h": 7
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "準確率"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "orientation": "auto",
+        "justifyMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "aqi-postgres"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT avg(CASE WHEN (CASE WHEN CASE WHEN a.aqi ~ '^[0-9]+(\\.[0-9]+)?$' THEN a.aqi::float END IS NULL THEN NULL WHEN CASE WHEN a.aqi ~ '^[0-9]+(\\.[0-9]+)?$' THEN a.aqi::float END <= 50 THEN 0 WHEN CASE WHEN a.aqi ~ '^[0-9]+(\\.[0-9]+)?$' THEN a.aqi::float END <= 100 THEN 1 WHEN CASE WHEN a.aqi ~ '^[0-9]+(\\.[0-9]+)?$' THEN a.aqi::float END <= 150 THEN 2 WHEN CASE WHEN a.aqi ~ '^[0-9]+(\\.[0-9]+)?$' THEN a.aqi::float END <= 200 THEN 3 WHEN CASE WHEN a.aqi ~ '^[0-9]+(\\.[0-9]+)?$' THEN a.aqi::float END <= 300 THEN 4 ELSE 5 END) = p.pred_class THEN 1.0 ELSE 0.0 END) AS 準確率, count(*) AS 筆數 FROM aqi_prediction p LEFT JOIN aqi4_info a ON a.device_id = p.sitename AND a.time = date_trunc('hour', p.image_time) WHERE (CASE WHEN CASE WHEN a.aqi ~ '^[0-9]+(\\.[0-9]+)?$' THEN a.aqi::float END IS NULL THEN NULL WHEN CASE WHEN a.aqi ~ '^[0-9]+(\\.[0-9]+)?$' THEN a.aqi::float END <= 50 THEN 0 WHEN CASE WHEN a.aqi ~ '^[0-9]+(\\.[0-9]+)?$' THEN a.aqi::float END <= 100 THEN 1 WHEN CASE WHEN a.aqi ~ '^[0-9]+(\\.[0-9]+)?$' THEN a.aqi::float END <= 150 THEN 2 WHEN CASE WHEN a.aqi ~ '^[0-9]+(\\.[0-9]+)?$' THEN a.aqi::float END <= 200 THEN 3 WHEN CASE WHEN a.aqi ~ '^[0-9]+(\\.[0-9]+)?$' THEN a.aqi::float END <= 300 THEN 4 ELSE 5 END) IS NOT NULL AND $__timeFilter(p.image_time AT TIME ZONE 'Asia/Taipei')",
+          "refId": "A"
+        }
+      ],
+      "description": "預測等級和照片拍攝那一小時環境部公布的 AQI 等級相同的比例。"
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "預測等級 vs 實際等級（0 Good … 5 Severe）",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "aqi-postgres"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 32,
+        "w": 24,
+        "h": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "stepAfter",
+            "showPoints": "always",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "aqi-postgres"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT p.image_time AT TIME ZONE 'Asia/Taipei' AS time, p.sitename || ' 預測' AS metric, p.pred_class AS value FROM aqi_prediction p WHERE $__timeFilter(p.image_time AT TIME ZONE 'Asia/Taipei') UNION ALL SELECT a.time AT TIME ZONE 'Asia/Taipei', a.device_id || ' 實際', CASE WHEN CASE WHEN a.aqi ~ '^[0-9]+(\\.[0-9]+)?$' THEN a.aqi::float END IS NULL THEN NULL WHEN CASE WHEN a.aqi ~ '^[0-9]+(\\.[0-9]+)?$' THEN a.aqi::float END <= 50 THEN 0 WHEN CASE WHEN a.aqi ~ '^[0-9]+(\\.[0-9]+)?$' THEN a.aqi::float END <= 100 THEN 1 WHEN CASE WHEN a.aqi ~ '^[0-9]+(\\.[0-9]+)?$' THEN a.aqi::float END <= 150 THEN 2 WHEN CASE WHEN a.aqi ~ '^[0-9]+(\\.[0-9]+)?$' THEN a.aqi::float END <= 200 THEN 3 WHEN CASE WHEN a.aqi ~ '^[0-9]+(\\.[0-9]+)?$' THEN a.aqi::float END <= 300 THEN 4 ELSE 5 END FROM aqi4_info a WHERE a.device_id IN ('基隆','林口','嘉義','安南') AND $__timeFilter(a.time AT TIME ZONE 'Asia/Taipei') ORDER BY 1",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "templating": {
+    "list": []
+  },
+  "annotations": {
+    "list": []
+  }
+}

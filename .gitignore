@@ -1,0 +1,9 @@
+# Secrets: created locally, loaded into the cluster by bootstrap-secrets.sh.
+secrets.env
+*.env
+!*.env.example
+
+__pycache__/
+*.pyc
+.venv/
+logs/

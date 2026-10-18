@@ -1,0 +1,46 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Resources live in two namespaces: monitoring (Prometheus, exporters) and
+# sql (Grafana, next to the databases it reads). Each file sets its own.
+resources:
+  - prometheus.yaml
+  - kube-state-metrics.yaml
+  - node-exporter.yaml
+  - postgres-exporter.yaml
+  - grafana.yaml
+  - monitoring-role-job.yaml
+
+# Generated names get a content hash, so editing any of these files rolls the
+# pods that use it (e.g. Prometheus picks up new alert rules). ArgoCD prunes
+# the old ConfigMaps.
+configMapGenerator:
+  - name: prometheus-config
+    namespace: monitoring
+    files:
+      - prometheus/prometheus.yml
+      - prometheus/alerts.yml
+  - name: postgres-exporter-queries
+    namespace: monitoring
+    files:
+      - postgres/queries.yaml
+  - name: grafana-datasources
+    namespace: sql
+    files:
+      - grafana/datasources.yaml
+  - name: grafana-dashboard-providers
+    namespace: sql
+    files:
+      - grafana/dashboard-providers.yaml
+  - name: grafana-dashboards
+    namespace: sql
+    files:
+      - grafana/dashboards/aqi-data.json
+      - grafana/dashboards/aqi-system.json
+  - name: monitoring-role-sql
+    namespace: sql
+    files:
+      - postgres/create-monitoring-role.sql
+
+# The monitoring-db Secrets (namespaces monitoring and sql) are not in git:
+# bootstrap-secrets.sh creates them from monitoring/secrets.env.

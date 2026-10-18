@@ -1,0 +1,139 @@
+# 觸發中的告警會顯示在 Prometheus 的 /alerts 頁面和 Grafana 儀表板上。
+# 目前沒有 Alertmanager，所以不會主動發通知。
+groups:
+  - name: aqi-pipeline
+    rules:
+      - alert: AqiDagRunFailed
+        expr: increase(airflow_dagrun_failed_count{dag_id="get_moenv_aqi_info_v2"}[1h]) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: 每小時 AQI DAG 在過去 1 小時內有執行失敗
+          description: 到 Airflow UI 查看 get_moenv_aqi_info_v2 失敗的 task log。
+
+      - alert: AqiStationDataStale
+        # 台灣測站每小時更新；最新資料超過 3 小時就是有問題
+        expr: time() - aqi_station_latest_timestamp_seconds{device_id=~"基隆|林口|嘉義|安南"} > 3 * 3600
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: '測站 {{ $labels.device_id }} 的 AQI 資料超過 3 小時沒有更新'
+
+      - alert: AqiDataMissing
+        expr: absent(aqi_station_latest_timestamp_seconds)
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: 讀不到 aqi4_info 的資料（表不存在、沒有資料，或 exporter 有問題）
+
+      - alert: AqiImagePredictDagFailed
+        expr: increase(airflow_dagrun_failed_count{dag_id="aqi_image_predict"}[1h]) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: 照片推論 DAG (aqi_image_predict) 在過去 1 小時內有執行失敗
+
+      - alert: AqiPredictionStale
+        # DAG 07 每小時 :20 執行；超過 3 小時沒有新預測代表照片、氣象或推論服務有問題
+        expr: time() - aqi_prediction_latest_image_timestamp_seconds > 3 * 3600
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: '測站 {{ $labels.sitename }} 超過 3 小時沒有新的照片推論結果'
+
+      - alert: PipelineHealthFailing
+        expr: pipeline_health_latest_status == 2
+        labels:
+          severity: critical
+        annotations:
+          summary: 最新一次流程健康檢查判定為 failing，到 Grafana「AQI 系統監控」看報告內容
+
+      - alert: PipelineHealthCheckStale
+        # aqi_pipeline_health 每 6 小時執行一次
+        expr: time() - pipeline_health_latest_check_timestamp_seconds > 7 * 3600
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: 流程健康檢查超過 7 小時沒有執行
+
+  - name: storage
+    rules:
+      - alert: PostgresDown
+        expr: pg_up == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'Postgres {{ $labels.db }} 連不上'
+
+      - alert: PostgresDatabaseLarge
+        # PVC 申請的是 2Gi；超過 1.5 GB 就該清資料或加大 PVC
+        expr: pg_database_size_bytes{datname=~"airflow_data|footprintai"} > 1.5e9
+        labels:
+          severity: warning
+        annotations:
+          summary: '資料庫 {{ $labels.datname }} 已超過 1.5 GB（PVC 為 2Gi）'
+
+      - alert: NodeDiskAlmostFull
+        # 只看實體檔案系統；minikube 的 / 是 overlay，資料其實在 /dev/sdc 上
+        expr: max by (node, device) (1 - node_filesystem_avail_bytes{fstype=~"ext4|xfs|btrfs"} / node_filesystem_size_bytes{fstype=~"ext4|xfs|btrfs"}) > 0.85
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: '{{ $labels.node }} 的磁碟 {{ $labels.device }} 剩不到 15%'
+
+      - alert: MinioBucketNearQuota
+        # aqi-images 的硬上限是 5GiB（minio/init.sh），超過就無法再寫入照片
+        expr: minio_bucket_usage_total_bytes{bucket="aqi-images"} > 4.5 * 1024 * 1024 * 1024
+        labels:
+          severity: warning
+        annotations:
+          summary: MinIO bucket aqi-images 已超過 4.5GiB（上限 5GiB）
+
+  - name: kubernetes
+    rules:
+      - alert: ScrapeTargetDown
+        expr: up == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Prometheus 抓不到 {{ $labels.job }}（{{ $labels.instance }}）'
+
+      - alert: PodRestartingOften
+        expr: increase(kube_pod_container_status_restarts_total[1h]) > 3
+        labels:
+          severity: warning
+        annotations:
+          summary: '{{ $labels.namespace }}/{{ $labels.pod }} 在 1 小時內重啟超過 3 次'
+
+      - alert: PodNotRunning
+        expr: sum by (namespace, pod) (kube_pod_status_phase{phase=~"Pending|Failed|Unknown"}) > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: '{{ $labels.namespace }}/{{ $labels.pod }} 超過 15 分鐘不是 Running'
+
+      - alert: ContainerOOMKilled
+        expr: |
+          kube_pod_container_status_last_terminated_reason{reason="OOMKilled"} == 1
+          and on (namespace, pod, container)
+          increase(kube_pod_container_status_restarts_total[30m]) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: '{{ $labels.namespace }}/{{ $labels.pod }} 的容器 {{ $labels.container }} 記憶體不足被砍掉 (OOMKilled)'
+
+      - alert: AqiWebDown
+        expr: kube_deployment_status_replicas_available{namespace="default",deployment="vqaweb"} < 1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: AQI 網站 (vqaweb) 沒有可用的 Pod

@@ -1,0 +1,22 @@
+# App of apps: ArgoCD syncs every Application in argocd/apps/, and each of
+# those syncs one part of the stack. Applied once by argocd/bootstrap.sh;
+# after that, adding a file to argocd/apps/ is enough to deploy something new.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: aqi-root
+  namespace: argocd
+  # No resources finalizer: deleting this Application must not delete the stack.
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/jack-lio/sql-k8s.git
+    targetRevision: main
+    path: argocd/apps
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
