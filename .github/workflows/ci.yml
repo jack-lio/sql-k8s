@@ -45,6 +45,7 @@ jobs:
               - dags/**
               - plugins/**
               - ci/**
+              - .github/workflows/ci.yml
 
   validate:
     runs-on: ubuntu-latest
