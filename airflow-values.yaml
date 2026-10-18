@@ -4,12 +4,12 @@ executor: CeleryExecutor
 # pushed to GHCR; ArgoCD then rolls the Airflow pods to that image.
 images:
   airflow:
-    repository: airflow-custom
-    tag: "2.6.1-py310-aqi-20261018c"
+    repository: ghcr.io/jack-lio/sql-k8s/airflow
+    tag: "2.6.1-py310-dd4e136"
     pullPolicy: IfNotPresent
 
-defaultAirflowRepository: airflow-custom
-defaultAirflowTag: "2.6.1-py310-aqi-20261018c"
+defaultAirflowRepository: ghcr.io/jack-lio/sql-k8s/airflow
+defaultAirflowTag: "2.6.1-py310-dd4e136"
 
 # Pull secret for a private GHCR package (created by bootstrap-secrets.sh when
 # GHCR_TOKEN is set). Pods still start when it is missing and the image is public.
