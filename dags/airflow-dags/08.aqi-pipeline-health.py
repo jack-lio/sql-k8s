@@ -128,6 +128,7 @@ def collect_signals():
             FROM aqi_prediction p
             JOIN aqi4_info a ON a.device_id = p.sitename AND a.time = date_trunc('hour', p.image_time)
             WHERE a.aqi ~ '^[0-9]+(\\.[0-9]+)?$' AND p.image_time > %s
+              AND p.model_version <> 'legacy'
             """, parameters=(now_local - timedelta(hours=24),))
         signals["prediction_accuracy_24h"] = {
             "compared": acc[0], "matched": acc[1],

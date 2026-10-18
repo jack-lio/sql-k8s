@@ -22,3 +22,11 @@ CREATE TABLE IF NOT EXISTS aqi_prediction (
 
 CREATE INDEX IF NOT EXISTS aqi_prediction_image_time_index
     ON aqi_prediction USING btree (image_time);
+
+-- model_version is what the inference service returns ("taiwan_v1", ...).
+-- Rows from before the column existed: model A served by vqaweb before
+-- 2026-10-18 20:38 (Taipei) came from the untrained "legacy" model.
+ALTER TABLE aqi_prediction ADD COLUMN IF NOT EXISTS model_version TEXT;
+UPDATE aqi_prediction
+   SET model_version = CASE WHEN predicted_at < '2026-10-18 20:38:00+08' THEN 'legacy' ELSE 'taiwan_v1' END
+ WHERE model_version IS NULL;

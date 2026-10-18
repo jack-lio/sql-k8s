@@ -144,10 +144,12 @@ def predict(ti):
             # 後端出錯時也回 200，錯誤放在 error 欄位
             print(f"  {sitename}: 推論失敗 {out['error']}")
             continue
-        print(f"  {sitename}: {out['AQI']} (class {out['pred_class']}, {out['regression_value']})")
+        print(f"  {sitename}: {out['AQI']} (class {out['pred_class']}, {out['regression_value']}, "
+              f"{out['model_version']})")
         rows.append((site_id, sitename, img["image_time"], img["image_key"], w["weather_time"],
                      w["rh"], w["rainfall"], w["temperature"], w["wd_hr"], w["ws_hr"],
-                     MODEL_NAME, out["pred_class"], out["AQI"], out["regression_value"]))
+                     MODEL_NAME, out["model_version"], out["pred_class"], out["AQI"],
+                     out["regression_value"]))
 
     if not rows:
         raise ValueError("沒有任何測站推論成功")
@@ -158,8 +160,8 @@ def predict(ti):
             """
             INSERT INTO aqi_prediction (site_id, sitename, image_time, image_key, weather_time,
                 rh, rainfall, temperature, wd_hr, ws_hr,
-                model_name, pred_class, pred_label, regression_value)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                model_name, model_version, pred_class, pred_label, regression_value)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (site_id, image_time, model_name) DO NOTHING
             """,
             rows,
