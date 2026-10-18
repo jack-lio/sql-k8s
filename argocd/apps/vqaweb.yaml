@@ -1,0 +1,28 @@
+# The AQI prediction web app (FastAPI + nginx), from its own repository.
+# Its CI sets the image tag in k8s/kustomization.yaml there; DAG 07 calls it
+# at http://vqaweb.default.svc/api/predict.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: vqaweb
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/jack-lio/VQAweb.git
+    targetRevision: main
+    path: k8s
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: 5
+      backoff:
+        duration: 30s
+        maxDuration: 5m

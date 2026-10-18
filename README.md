@@ -19,7 +19,8 @@ running in the cluster deploys.
    ├─ databases   k8s/          Postgres x2, storage quotas
    ├─ minio       minio/        images + reports bucket
    ├─ monitoring  monitoring/   Prometheus, exporters, Grafana
-   └─ airflow     Helm chart 1.10.0 + airflow-values.yaml
+   ├─ airflow     Helm chart 1.10.0 + airflow-values.yaml
+   └─ vqaweb      k8s/ in jack-lio/VQAweb (prediction service, own CI)
 ```
 
 The cluster pulls from GitHub, so it needs no inbound access: GitHub's
@@ -55,8 +56,8 @@ minikube start
 ./argocd/bootstrap.sh           # ArgoCD + the root Application
 ```
 
-ArgoCD then deploys everything else. The prediction service `vqaweb`
-(namespace `default`) is deployed from its own repository.
+ArgoCD then deploys everything else, including the prediction service
+`vqaweb` (namespace `default`) from the jack-lio/VQAweb repository.
 
 ## Day to day
 
