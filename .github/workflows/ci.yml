@@ -121,8 +121,8 @@ jobs:
 
       - name: Check the Anthropic SDK venv
         run: |
-          docker run --rm "$IMAGE:${{ steps.tag.outputs.tag }}" \
-            /home/airflow/anthropic-venv/bin/python -c 'import anthropic; print("anthropic", anthropic.__version__)'
+          docker run --rm --entrypoint /home/airflow/anthropic-venv/bin/python \
+            "$IMAGE:${{ steps.tag.outputs.tag }}" -c 'import anthropic; print("anthropic", anthropic.__version__)'
 
       - name: Push to GHCR
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
