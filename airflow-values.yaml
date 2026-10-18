@@ -5,11 +5,11 @@ executor: CeleryExecutor
 images:
   airflow:
     repository: ghcr.io/jack-lio/sql-k8s/airflow
-    tag: "2.6.1-py310-dd4e136"
+    tag: "2.6.1-py310-682481f"
     pullPolicy: IfNotPresent
 
 defaultAirflowRepository: ghcr.io/jack-lio/sql-k8s/airflow
-defaultAirflowTag: "2.6.1-py310-dd4e136"
+defaultAirflowTag: "2.6.1-py310-682481f"
 
 # Pull secret for a private GHCR package (created by bootstrap-secrets.sh when
 # GHCR_TOKEN is set). Pods still start when it is missing and the image is public.
