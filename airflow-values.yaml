@@ -11,10 +11,10 @@ images:
 defaultAirflowRepository: ghcr.io/jack-lio/sql-k8s/airflow
 defaultAirflowTag: "2.6.1-py310-682481f"
 
-# Pull secret for a private GHCR package (created by bootstrap-secrets.sh when
-# GHCR_TOKEN is set). Pods still start when it is missing and the image is public.
-registry:
-  secretName: ghcr-pull
+# The GHCR package is public, so no pull secret. For a private package, create
+# airflow/ghcr-pull with ghcr.env (bootstrap-secrets.sh) and uncomment:
+# registry:
+#   secretName: ghcr-pull
 
 # The chart generates these three with random values on every render. Helm only
 # did that at install time, but ArgoCD renders on every sync and would keep

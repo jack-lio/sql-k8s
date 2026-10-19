@@ -45,7 +45,7 @@ Nothing secret is committed (`.gitignore` excludes every `*.env`).
 | `anthropic.env` (`ANTHROPIC_API_KEY`, optional) | `airflow/airflow-dag-secrets` |
 | `minio/secrets.env` (generated) | `minio/minio-credentials`, Airflow connection `minio_aqi` |
 | `monitoring/secrets.env` (generated) | `monitoring-db` in `monitoring` and `sql` |
-| `ghcr.env` (`GHCR_USER`, `GHCR_TOKEN`, only for a private image) | `airflow/ghcr-pull` |
+| `ghcr.env` (`GHCR_USER`, `GHCR_TOKEN`, only for a private image; also uncomment `registry` in `airflow-values.yaml`) | `airflow/ghcr-pull` |
 | `argocd/repo.env` (`GITHUB_USER`, `GITHUB_TOKEN`, only for a private repo) | ArgoCD repository credentials |
 
 ## New cluster
