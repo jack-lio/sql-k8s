@@ -57,12 +57,6 @@ if ! kubectl -n airflow get secret airflow-fernet-key >/dev/null 2>&1; then
     fernet=$(python3 -c 'import base64, os; print(base64.urlsafe_b64encode(os.urandom(32)).decode())')
     apply_secret airflow airflow-fernet-key --from-literal=fernet-key="$fernet"
 fi
-if ! kubectl -n airflow get secret airflow-redis-password >/dev/null 2>&1; then
-    redis=$(openssl rand -hex 16)
-    apply_secret airflow airflow-redis-password --from-literal=password="$redis"
-    apply_secret airflow airflow-broker-url \
-        --from-literal=connection="redis://:$redis@airflow-redis:6379/0"
-fi
 
 if [[ -f "$ROOT/ghcr.env" ]]; then
     echo "==> GHCR pull secret"

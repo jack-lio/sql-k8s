@@ -42,7 +42,6 @@ kubectl -n airflow create secret generic airflow-dag-secrets "${args[@]}" \
     --dry-run=client -o yaml | kubectl apply -f -
 
 if [[ "${1:-}" == "--restart" ]]; then
-    kubectl -n airflow rollout restart deploy/airflow-scheduler statefulset/airflow-worker
-    kubectl -n airflow rollout status deploy/airflow-scheduler --timeout=5m
-    kubectl -n airflow rollout status statefulset/airflow-worker --timeout=5m
+    kubectl -n airflow rollout restart statefulset/airflow-scheduler
+    kubectl -n airflow rollout status statefulset/airflow-scheduler --timeout=5m
 fi

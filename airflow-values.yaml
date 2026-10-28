@@ -1,4 +1,8 @@
-executor: CeleryExecutor
+# LocalExecutor: the scheduler runs tasks itself, one process per running task.
+# The DAGs run a few tasks an hour, so CeleryExecutor's always-on worker
+# (16 pre-forked processes, ~1.5GiB) and its Redis broker were idle capacity
+# on a single node.
+executor: LocalExecutor
 
 # CI (.github/workflows/ci.yml) rewrites these four lines to the image it
 # pushed to GHCR; ArgoCD then rolls the Airflow pods to that image.
@@ -21,8 +25,6 @@ defaultAirflowTag: "2.6.1-py310-682481f"
 # rotating them (a new Fernet key breaks every stored connection). They are
 # created once by bootstrap-secrets.sh instead.
 fernetKeySecretName: airflow-fernet-key
-data:
-  brokerUrlSecretName: airflow-broker-url
 
 # MOENV_API_KEY and WAQI_TOKEN for 04.aqi-info.py, from the
 # airflow-dag-secrets Secret (created from k3s/secrets.env).
@@ -35,10 +37,12 @@ webserverSecretKey: "footprintai-local-dev-secret-key"
 
 config:
   core:
-    load_examples: "True"
+    load_examples: "False"
     dags_are_paused_at_creation: "True"
+    parallelism: 4            # LocalExecutor: at most 4 task processes at once
   webserver:
     expose_config: "True"
+    workers: 1                # gunicorn workers (default 4, ~340MiB each); one user
 
 dags:
   persistence:
@@ -70,24 +74,15 @@ scheduler:
       cpu: "1"
       memory: "2Gi"
 
+# With LocalExecutor the chart runs no worker pods. These settings now size the
+# task-log volume, which the chart mounts on the scheduler (a StatefulSet).
 workers:
-  replicas: 1
-  resources:
-    requests:
-      cpu: "250m"
-      memory: "1Gi"
-    limits:
-      cpu: "1"
-      memory: "2Gi"
+  persistence:
+    size: 5Gi
 
+# No DAG uses deferrable operators, so the triggerer had nothing to run.
 triggerer:
-  resources:
-    requests:
-      cpu: "100m"
-      memory: "512Mi"
-    limits:
-      cpu: "500m"
-      memory: "1Gi"
+  enabled: false
 
 postgresql:
   enabled: true
@@ -96,8 +91,7 @@ postgresql:
     tag: "15"
 
 redis:
-  enabled: true
-  passwordSecretName: airflow-redis-password
+  enabled: false
 
 # ArgoCD runs these Jobs as Sync hooks: deleted and re-created on every sync,
 # which avoids the "field is immutable" error that plain apply hits on Jobs.

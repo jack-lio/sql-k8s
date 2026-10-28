@@ -173,7 +173,7 @@ CKA topics, so they are done by hand, as practice.
 | [ ] | Networking | The minikube CNI doesn't enforce NetworkPolicy, so ArgoCD's policies have no effect | Cluster with `--cni=calico`; allow Postgres (5432) only from `airflow` and `monitoring` |
 | [ ] | Availability | No PodDisruptionBudgets; single node | Multi-node profile, `cordon` / `drain`, PDB for `vqaweb` with 2 replicas |
 | [ ] | Storage | No database backups | CronJob: `pg_dump` to MinIO daily, plus a tested restore |
-| [ ] | Storage | Airflow worker and triggerer log PVCs are 100Gi each | Smaller PVCs (recreate the StatefulSets) |
+| [ ] | Storage | The CeleryExecutor's log PVCs (`logs-airflow-worker-0`, `logs-airflow-triggerer-0`, 100Gi each) are unused since the switch to LocalExecutor | Delete them once the old task logs aren't needed |
 | [ ] | Security | Pods in `sql`, `monitoring`, `default` use the `default` ServiceAccount | Own ServiceAccounts, `automountServiceAccountToken: false`, minimal RBAC |
 | [ ] | Security | `vqaweb`, Postgres, Grafana, Prometheus run without `runAsNonRoot` | securityContext, read-only root filesystem with `emptyDir` for writable paths |
 | [ ] | Platform | ArgoCD's own components have no resources | Patch in `argocd/install/kustomization.yaml` |
