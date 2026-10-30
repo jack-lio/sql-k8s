@@ -2,8 +2,9 @@
 #
 # These limit what PVCs may REQUEST. On minikube (hostPath) the provisioner
 # does not enforce a PVC's size on disk, so the real caps are: Prometheus
-# --storage.tsdb.retention.size, the 3-day retention in the AQI DAG, and the
-# PostgresDatabaseLarge / NodeDiskAlmostFull alerts.
+# --storage.tsdb.retention.size and the PostgresDatabaseLarge /
+# NodeDiskAlmostFull alerts. (aqi4_info is kept indefinitely: about 35k rows,
+# a few MB, a year.)
 #
 # Apply: kubectl apply -f k8s/storage-limits.yaml
 # Check: kubectl describe resourcequota -n sql

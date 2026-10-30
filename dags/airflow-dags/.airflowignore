@@ -1,3 +1,2 @@
-airflow-dags/dags/.*
-airflow-dags/operators/.*
+airflow-dags/lib/.*
 airflow-dags/sql/.*

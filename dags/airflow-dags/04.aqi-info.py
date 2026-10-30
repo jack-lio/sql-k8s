@@ -1,170 +1,95 @@
+"""每小時把 4 個台灣測站的 AQI 寫進 aqi4_info。
+
+每次執行處理一個固定的小時（見 lib/moenv.py），從環境部的 AQI 歷史資料集
+aqx_p_488 抓那一小時的數值，所以漏掉的小時可以用 backfill 補回來。
+aqi4_info 是照片推論 (07) 的正確答案，不刪舊資料。
+"""
 import os
 import sys
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
-import json
-import requests
 from datetime import datetime, timedelta
+
 from airflow import DAG
-from airflow.models.param import Param
 from airflow.operators.python import PythonOperator
-from airflow.utils.dates import days_ago
+from airflow.providers.postgres.hooks.postgres import PostgresHook
+from airflow.providers.postgres.operators.postgres import PostgresOperator
 
-from dags.factory import DagFactory
-from operators.postgres import PostgresOp
-from lib.requests import debug_requests
+from lib import moenv
 
-
-# ✅ DAG ID
 DAG_ID = "get_moenv_aqi_info_v2"
+HERE = os.path.dirname(os.path.realpath(__file__))
+POSTGRES_CONN_ID = "postgres_default"
+AQI_DATASET = "aqx_p_488"  # 空氣品質指標(AQI)(歷史資料)，每小時一筆，可查到 2016 年
+LAG_HOURS = 1  # aqx_p_488 在下一小時的 :05 前會有上一小時的資料
 
-# ✅ 抓取資料邏輯
-def get_moenv_aqi_info_op(shard_id: int = 0, total_shard: int = 1):
-    records = []
-
-    # --- 台灣資料（moenv） ---
-    try:
-        url = "https://data.moenv.gov.tw/api/v2/aqx_p_432"
-        params = {
-            # 金鑰由 K8s Secret 以環境變數傳入，不要寫在程式碼裡
-            "api_key": os.environ["MOENV_API_KEY"],
-            "format": "json",
-            "limit": 1000
-        }
-
-        res = requests.get(url, params=params, verify=False)
-        payload = res.json()
-        # API 現在直接回傳 list，舊格式是 {"records": [...]}，兩種都支援
-        data = payload.get("records", []) if isinstance(payload, dict) else payload
-
-        target_sites = ["基隆", "林口", "嘉義", "安南"]
-        for i, d in enumerate(data):
-            if d.get("sitename") not in target_sites:
-                continue
-            if int(i % total_shard) != int(shard_id):
-                continue
-            records.append({
-                "device_id": str(d.get("sitename")),
-                "time": str(d.get("publishtime")),
-                "longitude": str(d.get("longitude", "")),
-                "latitude": str(d.get("latitude", "")),
-                "aqi": str(d.get("aqi", "")),
-                "pm2_5": str(d.get("pm2.5", "")),
-                "pm10": str(d.get("pm10", "")),
-                "o3": str(d.get("o3", "")),
-                "co": str(d.get("co", "")),
-                "so2": str(d.get("so2", "")),
-                "no2": str(d.get("no2", ""))
-            })
-    except Exception as e:
-        print("❌ 台灣資料抓取失敗:", e)
-
-    # --- 印度資料（WAQI） ---
-    try:
-        TOKEN = os.environ["WAQI_TOKEN"]
-        city_list = [
-            {"city": "india/eloor/udyogamandal", "device_id": "Eloor Udyogamandal"},
-            {"city": "india/thiruvananthapuram/kariavattom", "device_id": "Kariavattom Thiruvananthapuram India"}
-        ]
-
-        for idx, item in enumerate(city_list):
-            if int(idx % total_shard) != int(shard_id):
-                continue
-
-            city = item["city"]
-            device_id = item["device_id"]
-            url = f"https://api.waqi.info/feed/{city}/?token={TOKEN}"
-            response = requests.get(url)
-            data = response.json()
-
-            if data["status"] == "ok":
-                d = data["data"]
-                # 測站沒有回報時間時 time 是空字串，寫入 TIMESTAMP 欄位會失敗
-                if not d.get("time", {}).get("s"):
-                    print(f"⚠️ WAQI 測站沒有資料時間，略過：{device_id}")
-                    continue
-                iaqi = d.get("iaqi", {})
-                geo = d.get("city", {}).get("geo", [None, None])
-
-                records.append({
-                    "device_id": str(device_id),
-                    "time": str(d.get("time", {}).get("s", "")),
-                    "longitude": str(geo[1]),
-                    "latitude": str(geo[0]),
-                    "aqi": str(d.get("aqi", "")),
-                    "pm2_5": str(iaqi.get("pm25", {}).get("v", "")),
-                    "pm10": str(iaqi.get("pm10", {}).get("v", "")),
-                    "o3": str(iaqi.get("o3", {}).get("v", "")),
-                    "co": str(iaqi.get("co", {}).get("v", "")),
-                    "so2": str(iaqi.get("so2", {}).get("v", "")),
-                    "no2": str(iaqi.get("no2", {}).get("v", ""))
-                })
-            else:
-                print(f"❌ WAQI 資料抓取失敗：{device_id}")
-    except Exception as e:
-        print("❌ 印度資料抓取失敗:", e)
-
-    return {"status": "ok", "value": records}
+# aqi4_info 的欄位 -> aqx_p_488 的欄位
+FIELDS = {
+    "aqi": "aqi",
+    "pm2_5": "pm2.5",
+    "pm10": "pm10",
+    "o3": "o3",
+    "co": "co",
+    "so2": "so2",
+    "no2": "no2",
+    "longitude": "longitude",
+    "latitude": "latitude",
+}
 
 
-# ✅ 建立 DAG 的函數
-def get_aqi_info_dag():
-    with DagFactory(
-        DAG_ID,
-        "airflow",
-        start_date=days_ago(1),
-        schedule="@hourly",
-        catchup=False,
-        params={
-            "shard_id": Param(0, type="integer"),
-            "total_shard": Param(1, type="integer"),
-            "connection_id": Param("postgres_default", type="string")
-        },
-        template_searchpath=["/tmp", os.path.dirname(os.path.realpath(__file__))]
-    ).dag() as dag:
+def load_aqi(data_interval_end):
+    """抓這次負責的小時、4 個測站的 AQI，寫進 aqi4_info。缺任何一站就讓 task 失敗重試。"""
+    hour = moenv.target_hour(data_interval_end, LAG_HOURS)
+    print("小時:", hour)
 
-        pop = PostgresOp(dag, dag.params["connection_id"])
-        shard_id = dag.params["shard_id"]
-        total_shard = dag.params["total_shard"]
+    rows, missing = [], []
+    for station in moenv.STATIONS:
+        records = moenv.get(AQI_DATASET, limit=5,
+                            filters=f"sitename,EQ,{station}|datacreationdate,EQ,{hour:%Y-%m-%d %H:%M}")
+        if not records:
+            missing.append(station)
+            continue
+        r = records[0]
+        rows.append((station, hour, *(str(r.get(src, "")) for src in FIELDS.values())))
+        print(f"  {station}: AQI {r.get('aqi')}")
 
-        # 建立資料表
-        createtabletask = pop.create_table("sql/aqi4_info_schema.sql")
+    if rows:
+        cols = ", ".join(FIELDS)
+        updates = ", ".join(f"{c} = EXCLUDED.{c}" for c in FIELDS)
+        hook = PostgresHook(postgres_conn_id=POSTGRES_CONN_ID)
+        with hook.get_conn() as conn, conn.cursor() as cur:
+            cur.executemany(
+                f"INSERT INTO aqi4_info (device_id, time, {cols}) "
+                f"VALUES (%s, %s, {', '.join(['%s'] * len(FIELDS))}) "
+                f"ON CONFLICT (device_id, time) DO UPDATE SET {updates}",
+                rows,
+            )
+        print(f"寫入 {len(rows)} 筆")
 
-        # 刪除 N 天前的舊資料（例如保留 3 天）
-        delete_old_task = pop.execute_sql_task(
-        sql="""
-            DELETE FROM aqi4_info
-            WHERE time < NOW() - INTERVAL '3 days';
-        """,
-        task_id="delete_old_data"
-)
+    # 先寫入抓到的，再失敗：重試時只會補上缺的那幾站
+    if missing:
+        raise ValueError(f"{hour} 還沒有這些測站的 AQI：{missing}")
 
-        # 抓資料
-        gettask = PythonOperator(
-            task_id="get_moenv_aqi_info",
-            python_callable=get_moenv_aqi_info_op,
-            op_kwargs={"shard_id": shard_id, "total_shard": total_shard},
-            do_xcom_push=True,
-            dag=dag
-        )
 
-        # 產生 SQL 檔案
-        tmpfile = f"/tmp/aqi_info_bulk_stmt_{shard_id}_{total_shard}.sql"
-        generatesql = pop.generate_bulk_insert_stmt(
-            table_name="aqi4_info",
-            from_task_id="get_moenv_aqi_info",
-            out_sql_file=tmpfile,
-            update_on_conflict=False,
-            on_conflict_key="device_id"
-        )
+with DAG(
+    DAG_ID,
+    schedule="30 * * * *",
+    start_date=datetime(2026, 10, 18),
+    catchup=False,
+    max_active_runs=1,
+    default_args={
+        "owner": "airflow",
+        "retries": 3,
+        "retry_delay": timedelta(minutes=15),
+    },
+    template_searchpath=[HERE],
+    tags=["aqi"],
+) as dag:
+    create_table = PostgresOperator(
+        task_id="create_table",
+        postgres_conn_id=POSTGRES_CONN_ID,
+        sql="sql/aqi4_info_schema.sql",
+    )
+    load = PythonOperator(task_id="load_aqi", python_callable=load_aqi)
 
-        # 執行 SQL 寫入
-        insertdata = pop.bulk_insert_from_stmt(tmpfile)
-
-        # DAG 流程串接
-        createtabletask >> delete_old_task >> gettask >> generatesql >> insertdata
-
-    return dag
-
-# ✅ 註冊 DAG 給 Airflow 載入
-globals()[DAG_ID] = get_aqi_info_dag()
+    create_table >> load

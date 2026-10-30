@@ -61,16 +61,14 @@ sequenceDiagram
 ```mermaid
 flowchart LR
     moenv[/"MOENV open data<br/>AQI, weather, station photos"/]
-    waqi[/WAQI API/]
 
     subgraph af [Airflow]
-        d04["04 get_moenv_aqi_info_v2<br/>hourly"]
+        d04["04 get_moenv_aqi_info_v2<br/>:30 hourly"]
         d07["07 aqi_image_predict<br/>:20 hourly"]
         d08["08 aqi_pipeline_health<br/>every 6 h"]
     end
 
     moenv --> d04
-    waqi --> d04
     moenv -- "photo zip + weather" --> d07
 
     d04 --> aqi[("Postgres airflow_data<br/>aqi4_info")]
@@ -106,7 +104,7 @@ taken.
 
 | DAG | Schedule | What it does |
 |---|---|---|
-| `get_moenv_aqi_info_v2` (04) | hourly | MOENV + WAQI AQI into Postgres `aqi4_info` |
+| `get_moenv_aqi_info_v2` (04) | :30 hourly | the previous hour's AQI of the four stations, from MOENV's AQI history (`aqx_p_488`), into Postgres `aqi4_info`; kept indefinitely, since it is what predictions are scored against |
 | `aqi_image_predict` (07) | :20 hourly | station images to MinIO, weather values, prediction via `vqaweb`, into `aqi_prediction` (with `model_version`) |
 | `aqi_pipeline_health` (08) | every 6 h | collects DAG, database, MinIO and alert signals; Claude reviews them; report to Postgres and MinIO |
 
@@ -129,7 +127,7 @@ Nothing secret is committed (`.gitignore` excludes every `*.env`).
 
 | File | Secret |
 |---|---|
-| `api-keys.env` (`MOENV_API_KEY`, `WAQI_TOKEN`) | `airflow/airflow-dag-secrets` |
+| `api-keys.env` (`MOENV_API_KEY`) | `airflow/airflow-dag-secrets` |
 | `anthropic.env` (`ANTHROPIC_API_KEY`, optional) | `airflow/airflow-dag-secrets` |
 | `minio/secrets.env` (generated) | `minio/minio-credentials`, Airflow connection `minio_aqi` |
 | `monitoring/secrets.env` (generated) | `monitoring-db` in `monitoring` and `sql` |

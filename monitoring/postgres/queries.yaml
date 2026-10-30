@@ -2,8 +2,7 @@
 # Metric names are <key>_<column>, e.g. aqi_station_latest_timestamp_seconds.
 
 aqi_station:
-  # aqi4_info.time has no time zone. Taiwan stations publish in Asia/Taipei;
-  # the WAQI stations use their local time, so their freshness is approximate.
+  # aqi4_info.time has no time zone; it is Asia/Taipei.
   # The value columns are TEXT; non-numeric values (e.g. "" or "-") become NULL.
   query: |
     SELECT s.device_id, s.latest_timestamp_seconds, s.rows, l.latest_aqi, l.latest_pm2_5
