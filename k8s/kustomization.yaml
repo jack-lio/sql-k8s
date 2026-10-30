@@ -1,9 +1,8 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# The two Postgres instances in namespace sql and the storage limits of the
+# The Postgres for the DAG data in namespace sql and the storage limits of the
 # sql and monitoring namespaces. Synced by the ArgoCD Application "databases".
 resources:
   - airflow-data-postgres.yaml
-  - app-postgres.yaml
   - storage-limits.yaml

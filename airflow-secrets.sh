@@ -2,7 +2,7 @@
 # Create or update the airflow-dag-secrets Secret that every Airflow pod loads
 # as environment variables (extraEnvFrom in airflow-values.yaml):
 #
-#   MOENV_API_KEY, WAQI_TOKEN      from k3s/secrets.env
+#   MOENV_API_KEY, WAQI_TOKEN      from api-keys.env
 #   AIRFLOW_CONN_MINIO_AQI         from minio/secrets.env (connection "minio_aqi")
 #   ANTHROPIC_API_KEY              optional, from anthropic.env; without it the
 #                                  aqi_pipeline_health DAG skips the AI review
@@ -14,7 +14,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 set -a
 # shellcheck source=/dev/null
-source "$ROOT/k3s/secrets.env"
+source "$ROOT/api-keys.env"
 # shellcheck source=/dev/null
 source "$ROOT/minio/secrets.env"
 if [[ -f "$ROOT/anthropic.env" ]]; then

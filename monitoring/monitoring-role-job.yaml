@@ -1,5 +1,5 @@
-# Creates (or updates) the read-only "monitoring" role in both Postgres
-# databases, with the password from the monitoring-db Secret. Runs on every
+# Creates (or updates) the read-only "monitoring" role in the airflow_data
+# database, with the password from the monitoring-db Secret. Runs on every
 # ArgoCD sync (Sync hook), so a new password in monitoring/secrets.env is
 # applied by re-running bootstrap-secrets.sh and syncing.
 apiVersion: batch/v1
@@ -32,7 +32,6 @@ spec:
                   echo "monitoring role ready in $3"
               }
               role airflow-data-postgres airflow_data airflow_data
-              role app-postgres footprintai footprintai
           env:
             - name: MONITORING_DB_PASSWORD
               valueFrom:

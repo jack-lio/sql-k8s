@@ -72,7 +72,7 @@ groups:
 
       - alert: PostgresDatabaseLarge
         # PVC 申請的是 2Gi；超過 1.5 GB 就該清資料或加大 PVC
-        expr: pg_database_size_bytes{datname=~"airflow_data|footprintai"} > 1.5e9
+        expr: pg_database_size_bytes{datname="airflow_data"} > 1.5e9
         labels:
           severity: warning
         annotations:

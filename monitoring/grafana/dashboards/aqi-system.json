@@ -822,7 +822,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "pg_database_size_bytes{datname=~\"airflow_data|footprintai\"}",
+          "expr": "pg_database_size_bytes{datname=\"airflow_data\"}",
           "legendFormat": "{{datname}}",
           "refId": "A",
           "instant": true,
@@ -868,7 +868,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "pg_database_size_bytes{datname=~\"airflow_data|footprintai\"}",
+          "expr": "pg_database_size_bytes{datname=\"airflow_data\"}",
           "legendFormat": "{{datname}}",
           "refId": "A"
         }

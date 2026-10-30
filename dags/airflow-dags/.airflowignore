@@ -1,4 +1,3 @@
 airflow-dags/dags/.*
 airflow-dags/operators/.*
-airflow-dags/pytest/.*
 airflow-dags/sql/.*
