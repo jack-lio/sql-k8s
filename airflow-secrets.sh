@@ -2,7 +2,7 @@
 # Create or update the airflow-dag-secrets Secret that every Airflow pod loads
 # as environment variables (extraEnvFrom in airflow-values.yaml):
 #
-#   MOENV_API_KEY, WAQI_TOKEN      from api-keys.env
+#   MOENV_API_KEY                  from api-keys.env
 #   AIRFLOW_CONN_MINIO_AQI         from minio/secrets.env (connection "minio_aqi")
 #   ANTHROPIC_API_KEY              optional, from anthropic.env; without it the
 #                                  aqi_pipeline_health DAG skips the AI review
@@ -28,7 +28,6 @@ conn=$(printf '{"conn_type": "aws", "extra": {"aws_access_key_id": "%s", "aws_se
 
 args=(
     --from-literal=MOENV_API_KEY="$MOENV_API_KEY"
-    --from-literal=WAQI_TOKEN="$WAQI_TOKEN"
     --from-literal=AIRFLOW_CONN_MINIO_AQI="$conn"
 )
 if [[ -n "${ANTHROPIC_API_KEY:-}" ]]; then

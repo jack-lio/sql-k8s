@@ -12,13 +12,13 @@ groups:
           description: 到 Airflow UI 查看 get_moenv_aqi_info_v2 失敗的 task log。
 
       - alert: AqiStationDataStale
-        # 台灣測站每小時更新；最新資料超過 3 小時就是有問題
-        expr: time() - aqi_station_latest_timestamp_seconds{device_id=~"基隆|林口|嘉義|安南"} > 3 * 3600
+        # DAG 04 每小時 :30 抓上一小時的資料，最新一筆正常是 1.5～2.5 小時前；超過 4 小時就是有問題
+        expr: time() - aqi_station_latest_timestamp_seconds{device_id=~"基隆|林口|嘉義|安南"} > 4 * 3600
         for: 15m
         labels:
           severity: warning
         annotations:
-          summary: '測站 {{ $labels.device_id }} 的 AQI 資料超過 3 小時沒有更新'
+          summary: '測站 {{ $labels.device_id }} 的 AQI 資料超過 4 小時沒有更新'
 
       - alert: AqiDataMissing
         expr: absent(aqi_station_latest_timestamp_seconds)

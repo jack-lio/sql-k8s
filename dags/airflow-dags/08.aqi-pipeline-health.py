@@ -37,6 +37,8 @@ SDK_PYTHON = "/home/airflow/anthropic-venv/bin/python"  # 見 Dockerfile
 WATCHED_DAGS = ["get_moenv_aqi_info_v2", "aqi_image_predict"]
 TW_STATIONS = ["基隆", "林口", "嘉義", "安南"]
 STALE_HOURS = 3
+# 04 每小時 :30 抓上一小時的 AQI，最新一筆正常就有 1.5～2.5 小時，重試時更久
+AQI_STALE_HOURS = 4
 
 
 def _hours_since(ts, now):
@@ -97,7 +99,7 @@ def collect_signals():
         for s in TW_STATIONS:
             if s not in aqi:
                 finding("aqi_data", "critical", f"aqi4_info 沒有測站 {s} 的資料")
-            elif aqi[s]["hours_old"] > STALE_HOURS:
+            elif aqi[s]["hours_old"] > AQI_STALE_HOURS:
                 finding("aqi_data", "warning", f"測站 {s} 的 AQI 資料已經 {aqi[s]['hours_old']} 小時沒更新")
         signals["aqi_data"] = aqi
 
@@ -208,8 +210,9 @@ def ai_review(signals):
         "你是一套小型資料管線的 SRE 值班助手。請根據提供的監控資料，判斷整條流程是否健康，"
         "並用繁體中文寫出給工程師看的報告。\n\n"
         "流程（全部跑在一台 minikube 上）：\n"
-        "1. Airflow DAG get_moenv_aqi_info_v2：每小時整點從環境部抓 4 個台灣測站（基隆、林口、嘉義、安南）"
-        "的 AQI，寫進 Postgres 的 aqi4_info（只保留 3 天）。\n"
+        "1. Airflow DAG get_moenv_aqi_info_v2：每小時 :30 從環境部的 AQI 歷史資料集抓 4 個台灣測站"
+        "（基隆、林口、嘉義、安南）上一小時的 AQI，寫進 Postgres 的 aqi4_info（不刪舊資料），"
+        "所以最新一筆正常就是 1.5～2.5 小時前。\n"
         "2. Airflow DAG aqi_image_predict：每小時 :20 抓這 4 個測站的監測站照片存進 MinIO，"
         "抓上一小時的氣象值，呼叫推論服務 (vqaweb) 預測 AQI 等級，寫進 aqi_prediction。\n"
         "3. Prometheus + Grafana 監控以上元件。\n\n"

@@ -26,7 +26,7 @@ defaultAirflowTag: "2.6.1-py310-712b058"
 # created once by bootstrap-secrets.sh instead.
 fernetKeySecretName: airflow-fernet-key
 
-# MOENV_API_KEY and WAQI_TOKEN for 04.aqi-info.py, from the
+# MOENV_API_KEY for the AQI DAGs, from the
 # airflow-dag-secrets Secret (created from api-keys.env).
 extraEnvFrom: |
   - secretRef:
