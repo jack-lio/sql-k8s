@@ -5,14 +5,14 @@
 #
 #   minio/secrets.env       minio/minio-credentials        (generated if missing)
 #   monitoring/secrets.env  monitoring-db in monitoring, sql (generated if missing)
-#   k3s/secrets.env         \
+#   api-keys.env            \
 #   anthropic.env (optional) > airflow/airflow-dag-secrets  (airflow-secrets.sh)
 #   ghcr.env (optional)     airflow/ghcr-pull, for a private GHCR image:
 #                             GHCR_USER=<github user>
 #                             GHCR_TOKEN=<token with read:packages>
 #
-# Also creates the Airflow Fernet key, Redis password and broker URL once
-# (see airflow-values.yaml for why the chart must not generate them).
+# Also creates the Airflow Fernet key once
+# (see airflow-values.yaml for why the chart must not generate it).
 #
 # Usage: ./bootstrap-secrets.sh [--restart]
 #   --restart  restart the Airflow scheduler and worker to read new values

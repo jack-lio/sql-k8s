@@ -1,9 +1,9 @@
 # Storage limits for the sql and monitoring namespaces.
 #
-# These limit what PVCs may REQUEST. On minikube (hostPath) and k3s
-# (local-path) the provisioner does not enforce a PVC's size on disk, so the
-# real caps are: Prometheus --storage.tsdb.retention.size, the 3-day retention
-# in the AQI DAG, and the PostgresDatabaseLarge / NodeDiskAlmostFull alerts.
+# These limit what PVCs may REQUEST. On minikube (hostPath) the provisioner
+# does not enforce a PVC's size on disk, so the real caps are: Prometheus
+# --storage.tsdb.retention.size, the 3-day retention in the AQI DAG, and the
+# PostgresDatabaseLarge / NodeDiskAlmostFull alerts.
 #
 # Apply: kubectl apply -f k8s/storage-limits.yaml
 # Check: kubectl describe resourcequota -n sql

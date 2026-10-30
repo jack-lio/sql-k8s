@@ -129,7 +129,7 @@ Nothing secret is committed (`.gitignore` excludes every `*.env`).
 
 | File | Secret |
 |---|---|
-| `k3s/secrets.env` (`MOENV_API_KEY`, `WAQI_TOKEN`) | `airflow/airflow-dag-secrets` |
+| `api-keys.env` (`MOENV_API_KEY`, `WAQI_TOKEN`) | `airflow/airflow-dag-secrets` |
 | `anthropic.env` (`ANTHROPIC_API_KEY`, optional) | `airflow/airflow-dag-secrets` |
 | `minio/secrets.env` (generated) | `minio/minio-credentials`, Airflow connection `minio_aqi` |
 | `monitoring/secrets.env` (generated) | `monitoring-db` in `monitoring` and `sql` |
@@ -182,5 +182,3 @@ CKA topics, so they are done by hand, as practice.
 ArgoCD runs with `selfHeal`: a manual `kubectl edit` on anything it manages is
 reverted within seconds. Try changes in a namespace ArgoCD doesn't manage
 (`kubectl create ns practice`), then commit the final manifest.
-
-`k3s/` holds the Raspberry Pi variant and is not deployed by ArgoCD.
