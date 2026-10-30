@@ -1,56 +1,23 @@
 # airflow-dags
-a collection of airflow dags
 
+The DAGs that run in the cluster. CI loads every file here in the built
+Airflow image (`ci/test_dags.py`) and fails on import errors or a missing DAG.
 
-### testing ###
+| File | DAG | Schedule |
+|---|---|---|
+| `04.aqi-info.py` | `get_moenv_aqi_info_v2` | hourly |
+| `07.aqi-image-predict.py` | `aqi_image_predict` | :20 hourly |
+| `08.aqi-pipeline-health.py` | `aqi_pipeline_health` | every 6 h |
 
-We leveraged docker-compose for setting up envirnoment for us to test. One can keep folders organized as follows:
-```
-├── dags
-│   └── airflow-dags
-├── docker-compose.yaml
-├── logs
-├── plugins
-```
-and the airflow-dags (e.g. this repo) can be placed under dags.
+What each one does is in the repository README.
 
-You can use the following command to create folders
-```
-mkdir -p ./dags ./logs ./plugins
-echo -e "AIRFLOW_UID=$(id -u)" > .env
-cd ./dags && git clone https://github.com/footprintai/airflow-dags
+Shared code (listed in `.airflowignore`, so Airflow doesn't parse it as DAGs):
 
-// copy docker-compose file onto the top level of dirs
-cp ./dags/airflow-dags/docker-compose.yaml ./
-```
+- `dags/factory.py`: `DagFactory`, the common DAG defaults
+- `operators/postgres.py`: `PostgresOp`, creates tables and bulk-inserts XCom records
+- `lib/requests.py`: request logging for debugging
+- `sql/`: the table schemas
 
-We placed additional postgres for storing application data (i.e. the output of each dags are placed under this databases)
-You can use `docker inpsect` to lookup its IP and configure a connection via airflow UI for the communication.
-
-##### init db #####
-
-run the following command to init db
-
-```
-docker compose up airflow-init
-```
-
-##### run #####
-```
-docker compose up
-```
-
-##### login #####
-
-```
-http://localhost:8080
-
-with account:airflow, password: airflow
-
-```
-
-##### clean up ######
-
-```
-docker compose down --volumes --rmi all
-```
+The helpers come from
+[footprintai/airflow-dags](https://github.com/footprintai/airflow-dags)
+(Apache 2.0, see `LICENSE`).
