@@ -1,4 +1,4 @@
-# Postgres for the DAG data (airflow-data-postgres) and the app (app-postgres), plus the storage quotas of sql and monitoring.
+# Postgres for the DAG data (airflow-data-postgres), plus the storage quotas of sql and monitoring.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

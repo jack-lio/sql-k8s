@@ -75,9 +75,6 @@ scrape_configs:
       - targets: [postgres-exporter-aqi.monitoring.svc:9187]
         labels:
           db: airflow_data
-      - targets: [postgres-exporter-app.monitoring.svc:9187]
-        labels:
-          db: footprintai
 
   # MinIO：叢集健康、可用空間（照片存放）
   - job_name: minio

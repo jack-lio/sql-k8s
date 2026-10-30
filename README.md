@@ -24,7 +24,7 @@ flowchart LR
 
     subgraph mk [minikube]
         argocd["ArgoCD<br/>app of apps: argocd/root.yaml"]
-        argocd --> databases["databases (sync wave 0)<br/>k8s/: Postgres x2, quotas"]
+        argocd --> databases["databases (sync wave 0)<br/>k8s/: Postgres, quotas"]
         argocd --> minio["minio (wave 1)<br/>images + reports"]
         argocd --> vqaweb["vqaweb (wave 1)<br/>prediction service"]
         argocd --> monitoring["monitoring (wave 2)<br/>Prometheus, exporters, Grafana"]
@@ -86,7 +86,7 @@ flowchart LR
     d08 -- "rules + Claude review<br/>(optional)" --> rep[("pipeline_health_report<br/>+ reports/*.md in MinIO")]
 
     subgraph mon [monitoring]
-        exp["postgres-exporter x2<br/>kube-state-metrics, node-exporter"]
+        exp["postgres-exporter<br/>kube-state-metrics, node-exporter"]
         prom[Prometheus<br/>16 alert rules]
         graf[Grafana<br/>AQI data, AQI system]
         exp --> prom --> graf
@@ -168,7 +168,7 @@ CKA topics, so they are done by hand, as practice.
 
 | | Area | Gap | Plan |
 |---|---|---|---|
-| [ ] | Workloads | Both Postgres Deployments in `sql` have no requests/limits and no liveness probe; readiness probes time out (1 s) under load | Size from `kubectl top`, add `livenessProbe`, raise `timeoutSeconds` |
+| [ ] | Workloads | The Postgres Deployment in `sql` has no requests/limits and no liveness probe; readiness probes time out (1 s) under load | Size from `kubectl top`, add `livenessProbe`, raise `timeoutSeconds` |
 | [ ] | Scaling | `vqaweb` runs 1 replica, no HPA | metrics-server + HPA on CPU; `ignoreDifferences` on `spec.replicas` so ArgoCD doesn't undo it |
 | [ ] | Networking | The minikube CNI doesn't enforce NetworkPolicy, so ArgoCD's policies have no effect | Cluster with `--cni=calico`; allow Postgres (5432) only from `airflow` and `monitoring` |
 | [ ] | Availability | No PodDisruptionBudgets; single node | Multi-node profile, `cordon` / `drain`, PDB for `vqaweb` with 2 replicas |

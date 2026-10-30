@@ -1,4 +1,4 @@
-# One exporter per database. Both log in as the read-only "monitoring" role
+# Exporter for airflow_data. It logs in as the read-only "monitoring" role
 # (postgres/create-monitoring-role.sql), never as the application user.
 apiVersion: apps/v1
 kind: Deployment
@@ -59,59 +59,6 @@ metadata:
 spec:
   selector:
     app: postgres-exporter-aqi
-  ports:
-    - name: metrics
-      port: 9187
-      targetPort: metrics
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: postgres-exporter-app
-  namespace: monitoring
-  labels:
-    app: postgres-exporter-app
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: postgres-exporter-app
-  template:
-    metadata:
-      labels:
-        app: postgres-exporter-app
-    spec:
-      containers:
-        - name: postgres-exporter
-          image: quay.io/prometheuscommunity/postgres-exporter:v0.15.0
-          env:
-            - name: DATA_SOURCE_URI
-              value: app-postgres.sql.svc:5432/footprintai?sslmode=disable
-            - name: DATA_SOURCE_USER
-              value: monitoring
-            - name: DATA_SOURCE_PASS
-              valueFrom:
-                secretKeyRef:
-                  name: monitoring-db
-                  key: MONITORING_DB_PASSWORD
-          ports:
-            - name: metrics
-              containerPort: 9187
-          resources:
-            requests:
-              cpu: 10m
-              memory: 32Mi
-            limits:
-              memory: 128Mi
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: postgres-exporter-app
-  namespace: monitoring
-spec:
-  selector:
-    app: postgres-exporter-app
   ports:
     - name: metrics
       port: 9187

@@ -14,7 +14,7 @@ metadata:
   namespace: sql
 spec:
   hard:
-    # Currently 2Gi + 2Gi + 1Gi (two Postgres, Grafana).
+    # Currently 2Gi + 1Gi (Postgres, Grafana).
     requests.storage: 10Gi
     persistentvolumeclaims: "5"
 ---
