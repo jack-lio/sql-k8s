@@ -9,11 +9,11 @@ executor: LocalExecutor
 images:
   airflow:
     repository: ghcr.io/jack-lio/sql-k8s/airflow
-    tag: "2.6.1-py310-fa64abc"
+    tag: "2.6.1-py310-119e788"
     pullPolicy: IfNotPresent
 
 defaultAirflowRepository: ghcr.io/jack-lio/sql-k8s/airflow
-defaultAirflowTag: "2.6.1-py310-fa64abc"
+defaultAirflowTag: "2.6.1-py310-119e788"
 
 # The GHCR package is public, so no pull secret. For a private package, create
 # airflow/ghcr-pull with ghcr.env (bootstrap-secrets.sh) and uncomment:
