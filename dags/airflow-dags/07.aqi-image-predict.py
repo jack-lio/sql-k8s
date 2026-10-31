@@ -6,6 +6,7 @@ import io
 import re
 import zipfile
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import requests
 import urllib3
@@ -44,6 +45,8 @@ WEATHER_ITEMS = {
     "wd_hr": "WD_HR",
     "ws_hr": "WS_HR",
 }
+# 環境部每 10 分鐘發布一包照片；最新一包比這更舊，就當作沒拿到新資料
+MAX_ZIP_AGE = timedelta(minutes=40)
 IMAGE_NAME = re.compile(r"^(\d{3})-(\d{12})\.jpg$")  # e.g. 001-202610181000.jpg
 
 
@@ -57,11 +60,18 @@ def _moenv(dataset: str, **params):
 
 def fetch_images():
     """下載最新的測站照片 zip，把 4 個測站的照片存進 MinIO。"""
-    files = _moenv(IMAGE_DATASET, limit=5)
+    # 沒指定排序時，API 不保證新的在前：10/31 00:20–04:20 一直拿到 23:55 那包舊 zip
+    files = _moenv(IMAGE_DATASET, limit=5, sort="upload_date desc")
     if not files:
         raise ValueError(f"{IMAGE_DATASET} 沒有回傳任何檔案")
     latest = max(files, key=lambda f: f["upload_date"])
     print("zip:", latest["filename"], latest["upload_date"])
+    # upload_date 是台灣時間，不帶時區
+    age = datetime.now(ZoneInfo("Asia/Taipei")).replace(tzinfo=None) \
+        - datetime.strptime(latest["upload_date"], "%Y%m%dT%H%M%S")
+    if age > MAX_ZIP_AGE:
+        # 失敗後會重試；不失敗的話，舊照片會被 ON CONFLICT 略過，看起來像成功但沒有新資料
+        raise ValueError(f"最新的 zip 已經是 {age} 前的，API 可能回傳了舊資料")
 
     res = requests.get(latest["url"], timeout=300)
     res.raise_for_status()
