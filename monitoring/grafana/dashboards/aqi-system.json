@@ -1250,7 +1250,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "1 - avg(rate(node_cpu_seconds_total{mode=\"idle\"}[5m]))",
+          "expr": "1 - sum(rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) / sum(rate(node_cpu_seconds_total[5m]))",
           "legendFormat": "",
           "refId": "A",
           "instant": true,
